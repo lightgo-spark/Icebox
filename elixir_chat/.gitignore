@@ -1,13 +1,28 @@
+# Build artifacts
 _build/
 deps/
+
+# Database files (SQLite)
 *.db
 *.db-shm
 *.db-wal
+
+# User uploads
 priv/static/uploads/*
 !priv/static/uploads/.gitkeep
+
+# Built assets
 priv/static/assets/
+
+# Node modules
 node_modules/
+
+# Environment / secrets
 .env
 *.env
+
+# Editor / OS
 .DS_Store
 Thumbs.db
+*.swp
+*~
