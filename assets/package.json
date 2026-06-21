@@ -1,0 +1,13 @@
+{
+  "repository": {},
+  "description": " ",
+  "license": "MIT",
+  "scripts": {
+    "deploy": "../node_modules/.bin/esbuild js/app.js --bundle --minify --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*"
+  },
+  "dependencies": {
+    "phoenix": "file:../deps/phoenix",
+    "phoenix_live_view": "file:../deps/phoenix_live_view"
+  },
+  "devDependencies": {}
+}

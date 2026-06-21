@@ -1,0 +1,696 @@
+<%!-- Admin login modal --%>
+<%= if @show_admin_login do %>
+  <div class="modal-overlay">
+    <div class="modal-card modal-small">
+      <div class="modal-header">
+        <div class="modal-logo">🛡️</div>
+        <h1 class="modal-title">Admin Login</h1>
+        <p class="modal-subtitle">Enter the admin password</p>
+      </div>
+      <%= if @admin_error do %>
+        <div class="flash-error"><%= @admin_error %></div>
+      <% end %>
+      <form phx-submit="admin_login" class="modal-form">
+        <input type="password" name="password" placeholder="Password"
+          class="modal-input" autofocus autocomplete="off" />
+        <div class="modal-actions">
+          <button type="submit" class="modal-btn">Login</button>
+          <button type="button" phx-click="close_admin_login" class="modal-btn-cancel">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+<% end %>
+
+<%!-- Admin panel modal --%>
+<%= if @show_admin_panel and @is_admin do %>
+  <div class="modal-overlay admin-panel-overlay">
+    <div class="admin-panel-card">
+      <div class="admin-panel-header">
+        <span class="admin-panel-title">Admin Panel</span>
+        <div class="admin-panel-header-actions">
+          <button phx-click="admin_logout" class="admin-logout-btn">Logout</button>
+          <button phx-click="close_admin_panel" class="thread-close-btn">✕</button>
+        </div>
+      </div>
+
+      <div class="admin-tabs">
+        <button class={"admin-tab #{if @admin_tab == :users, do: "active"}"} phx-click="set_admin_tab" phx-value-tab="users">Users</button>
+        <button class={"admin-tab #{if @admin_tab == :announce, do: "active"}"} phx-click="set_admin_tab" phx-value-tab="announce">Announce</button>
+        <button class={"admin-tab #{if @admin_tab == :channels, do: "active"}"} phx-click="set_admin_tab" phx-value-tab="channels">Channels</button>
+        <button class={"admin-tab #{if @admin_tab == :stats, do: "active"}"} phx-click="set_admin_tab" phx-value-tab="stats">Stats</button>
+        <button class={"admin-tab #{if @admin_tab == :settings, do: "active"}"} phx-click="set_admin_tab" phx-value-tab="settings">Settings</button>
+      </div>
+
+      <div class="admin-panel-body">
+
+        <%!-- Users tab --%>
+        <%= if @admin_tab == :users do %>
+          <div class="admin-section">
+            <div class="admin-section-title">Online Users (<%= length(@online_users) %>)</div>
+            <%= for user <- @online_users do %>
+              <div class="admin-user-row">
+                <div class="admin-user-avatar" style={"background:#{user_color(user)}"}>
+                  <%= String.first(user) |> String.upcase() %>
+                </div>
+                <span class="admin-user-name"><%= user %></span>
+                <%= if user != @username do %>
+                  <button class="admin-action-btn warn"
+                    phx-click="admin_kick_user" phx-value-username={user}
+                    data-confirm={"Kick #{user}?"}>Kick</button>
+                  <button class="admin-action-btn danger"
+                    phx-click="admin_ban_user" phx-value-username={user}
+                    data-confirm={"Ban #{user}?"}>Ban</button>
+                <% else %>
+                  <span class="admin-me-label">Me (Admin)</span>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+
+          <%= if length(@banned_users) > 0 do %>
+            <div class="admin-section">
+              <div class="admin-section-title">Banned Users (<%= length(@banned_users) %>)</div>
+              <%= for user <- @banned_users do %>
+                <div class="admin-user-row">
+                  <div class="admin-user-avatar banned">🚫</div>
+                  <span class="admin-user-name banned"><%= user %></span>
+                  <button class="admin-action-btn success"
+                    phx-click="admin_unban_user" phx-value-username={user}>Unban</button>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        <% end %>
+
+        <%!-- Announce tab --%>
+        <%= if @admin_tab == :announce do %>
+          <div class="admin-section">
+            <div class="admin-section-title">Send System Announcement</div>
+            <div class="admin-announce-form">
+              <form phx-change="update_announce_text" id="admin-announce-form">
+                <textarea name="text"
+                  class="admin-textarea"
+                  placeholder="Type your announcement..."
+                  maxlength="500"
+                  rows="4"><%= @admin_announce_text %></textarea>
+              </form>
+              <div class="admin-announce-actions">
+                <button phx-click="admin_announce" phx-value-scope="channel" class="admin-btn">
+                  Current Channel
+                </button>
+                <button phx-click="admin_announce" phx-value-scope="all" class="admin-btn admin-btn-all">
+                  All Channels
+                </button>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <%!-- Channel management tab --%>
+        <%= if @admin_tab == :channels do %>
+          <div class="admin-section">
+            <div class="admin-section-title">Channel Management (<%= length(@channels) %>)</div>
+            <%= for ch <- @channels do %>
+              <div class="admin-channel-row">
+                <span class="admin-ch-hash">#</span>
+                <span class="admin-ch-name"><%= ch.display_name %></span>
+                <%= if ch.is_default do %>
+                  <span class="admin-default-badge">Default</span>
+                <% end %>
+                <div class="admin-ch-actions">
+                  <button class="admin-action-btn warn"
+                    phx-click="admin_clear_channel" phx-value-name={ch.name}
+                    data-confirm={"Delete all messages in ##{ch.display_name}?"}>
+                    Clear History
+                  </button>
+                  <button class="admin-action-btn danger"
+                    phx-click="admin_force_delete_channel" phx-value-name={ch.name}
+                    data-confirm={"Permanently delete ##{ch.display_name}?"}>
+                    Delete Channel
+                  </button>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+
+        <%!-- Stats tab --%>
+        <%= if @admin_tab == :stats do %>
+          <div class="admin-section">
+            <div class="admin-section-title">Current Status</div>
+            <div class="admin-stats-grid">
+              <div class="admin-stat-card">
+                <div class="admin-stat-value"><%= length(@channels) %></div>
+                <div class="admin-stat-label">Total Channels</div>
+              </div>
+              <div class="admin-stat-card">
+                <div class="admin-stat-value"><%= length(@online_users) %></div>
+                <div class="admin-stat-label">Online Users</div>
+              </div>
+              <div class="admin-stat-card">
+                <div class="admin-stat-value"><%= length(@messages) %></div>
+                <div class="admin-stat-label">Loaded Messages</div>
+              </div>
+              <div class="admin-stat-card">
+                <div class="admin-stat-value"><%= length(@banned_users) %></div>
+                <div class="admin-stat-label">Banned Users</div>
+              </div>
+              <div class="admin-stat-card">
+                <div class="admin-stat-value"><%= length(@pinned_messages) %></div>
+                <div class="admin-stat-label">Pinned Messages</div>
+              </div>
+              <div class="admin-stat-card">
+                <div class="admin-stat-value">#<%= room_display(@channels, @room) %></div>
+                <div class="admin-stat-label">Current Channel</div>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <%!-- Settings tab --%>
+        <%= if @admin_tab == :settings do %>
+          <div class="admin-section">
+            <div class="admin-section-title">Change Admin Password</div>
+            <%= if @password_changed do %>
+              <div class="flash-success">Password changed successfully.</div>
+            <% end %>
+            <%= if @password_error do %>
+              <div class="flash-error"><%= @password_error %></div>
+            <% end %>
+            <form phx-submit="admin_change_password" class="settings-form">
+              <div class="field-group">
+                <label class="field-label">Current Password</label>
+                <input type="password" name="current" placeholder="Enter current password"
+                  class="modal-input" autocomplete="off" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">New Password</label>
+                <input type="password" name="new_password" placeholder="Enter new password"
+                  class="modal-input" autocomplete="off" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Confirm New Password</label>
+                <input type="password" name="confirm" placeholder="Confirm new password"
+                  class="modal-input" autocomplete="off" />
+              </div>
+              <button type="submit" class="admin-btn" style="margin-top:8px;">Change Password</button>
+            </form>
+          </div>
+        <% end %>
+
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%!-- Username modal --%>
+<%= if @show_username_modal do %>
+  <div class="modal-overlay" id="username-modal" phx-hook="RestoreUsername">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-logo">💬</div>
+        <h1 class="modal-title">Welcome to LiveChat!</h1>
+        <p class="modal-subtitle">Enter a username to start chatting</p>
+      </div>
+      <%= if flash = Phoenix.Flash.get(@flash, :error) do %>
+        <div class="flash-error"><%= flash %></div>
+      <% end %>
+      <form phx-submit="set_username" class="modal-form">
+        <input type="text" name="username" placeholder="Enter username (max 20 chars)"
+          class="modal-input" maxlength="20" autofocus autocomplete="off" />
+        <button type="submit" class="modal-btn">Join Chat →</button>
+      </form>
+      <div class="room-grid">
+        <%= for ch <- @channels do %>
+          <div class={"room-chip #{if ch.name == @room, do: "active"}"}>
+            #<%= ch.display_name %>
+          </div>
+        <% end %>
+      </div>
+      <div class="terms-notice">
+        <p>By joining, you agree to the following:</p>
+        <ul>
+          <li>Do not upload illegal content, copyrighted material, or explicit imagery.</li>
+          <li>Do not impersonate others or engage in harassment.</li>
+          <li>Minimal access logs (IP address) may be stored for service stability and security.</li>
+          <li>Administrators may delete messages and ban users who violate these rules.</li>
+        </ul>
+        <p class="terms-copyright">Copyright &copy; 2026 lightgo (lightgo1230@gmail.com)</p>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%!-- Create channel modal --%>
+<%= if @show_channel_modal do %>
+  <div class="modal-overlay">
+    <div class="modal-card modal-small">
+      <div class="modal-header">
+        <div class="modal-logo">➕</div>
+        <h1 class="modal-title">Create New Channel</h1>
+      </div>
+      <%= if @ch_error do %>
+        <div class="flash-error"><%= @ch_error %></div>
+      <% end %>
+      <div class="modal-form">
+        <div class="field-group">
+          <label class="field-label">Channel Name (a-z, 0-9, _, -)</label>
+          <input type="text" value={@new_ch_name} placeholder="e.g. my-channel"
+            class="modal-input" maxlength="32"
+            phx-keyup="update_ch_field" phx-value-field="name" autocomplete="off" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Display Name</label>
+          <input type="text" value={@new_ch_display} placeholder="e.g. My Channel"
+            class="modal-input" maxlength="32"
+            phx-keyup="update_ch_field" phx-value-field="display" autocomplete="off" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Description (optional)</label>
+          <input type="text" value={@new_ch_desc} placeholder="Channel description"
+            class="modal-input" maxlength="100"
+            phx-keyup="update_ch_field" phx-value-field="desc" autocomplete="off" />
+        </div>
+        <div class="modal-actions">
+          <button phx-click="create_channel" class="modal-btn">Create Channel</button>
+          <button phx-click="toggle_channel_modal" class="modal-btn-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%!-- Main layout --%>
+<div class="chat-app" id="chat-app">
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <%!-- Sidebar --%>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">💬</span>
+      <span class="brand-name">LiveChat</span>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-label">
+        Channels
+        <button class="add-ch-btn" phx-click="toggle_channel_modal" title="Add channel">＋</button>
+      </div>
+      <%= for ch <- @channels do %>
+        <div class={"room-row #{if ch.name == @room, do: "active"}"}>
+          <button class="room-btn" phx-click="change_room" phx-value-room={ch.name}>
+            <span class="room-hash">#</span>
+            <span class="room-label"><%= ch.display_name %></span>
+            <%= if Map.get(@unread_counts, ch.name, 0) > 0 and ch.name != @room do %>
+              <span class="unread-badge"><%= Map.get(@unread_counts, ch.name, 0) %></span>
+            <% end %>
+          </button>
+          <%= if not ch.is_default do %>
+            <button class="del-ch-btn" phx-click="delete_channel" phx-value-name={ch.name}
+              title="Delete channel" data-confirm={"Delete ##{ch.display_name}?"}>✕</button>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-label">
+        Online
+        <span class="online-count"><%= length(@online_users) %></span>
+      </div>
+      <%= for user <- Enum.take(@online_users, 15) do %>
+        <div class="user-item">
+          <div class="user-avatar" style={"background: #{user_color(user)};"}>
+            <%= String.first(user) |> String.upcase() %>
+          </div>
+          <span class={"user-name #{if user == @username, do: "is-me"}"}><%= user %></span>
+          <%= if user == @username do %>
+            <span class="me-badge">Me</span>
+          <% end %>
+        </div>
+      <% end %>
+      <%= if length(@online_users) > 15 do %>
+        <div class="more-users">+<%= length(@online_users) - 15 %> more</div>
+      <% end %>
+    </div>
+
+    <%= if @username do %>
+      <div class="sidebar-me">
+        <div class="me-avatar" style={"background: #{user_color(@username)};"}>
+          <%= String.first(@username) |> String.upcase() %>
+        </div>
+        <div class="me-info">
+          <div class="me-name">
+            <%= @username %>
+            <%= if @is_admin do %><span class="admin-crown">👑</span><% end %>
+          </div>
+          <div class="me-status">● Online</div>
+        </div>
+        <%= if @is_admin do %>
+          <button phx-click="open_admin_panel" class="admin-panel-btn" title="Open admin panel">⚙️</button>
+        <% else %>
+          <button phx-click="open_admin_login" class="admin-panel-btn" title="Admin login">🛡️</button>
+        <% end %>
+      </div>
+    <% end %>
+  </aside>
+
+  <%!-- Main chat --%>
+  <main class="chat-main">
+
+    <%!-- Header --%>
+    <header class="chat-header">
+      <div class="header-left">
+        <button class="hamburger-btn" id="hamburger-btn" aria-label="Menu">☰</button>
+        <span class="header-hash">#</span>
+        <span class="header-room"><%= room_display(@channels, @room) %></span>
+        <span class="header-divider">|</span>
+        <span class="header-desc"><%= room_desc(@channels, @room) %></span>
+      </div>
+      <div class="header-right">
+        <%= if length(@pinned_messages) > 0 do %>
+          <button class={"header-icon-btn #{if @show_pins, do: "active"}"} phx-click="toggle_pins" title="Pinned messages">
+            📌 <span class="pin-count"><%= length(@pinned_messages) %></span>
+          </button>
+        <% end %>
+        <button class={"header-icon-btn #{if @search_open, do: "active"}"} phx-click="toggle_search" title="Search">
+          🔍
+        </button>
+        <span class="header-online">👥 <%= length(@online_users) %></span>
+      </div>
+    </header>
+
+    <%!-- Search bar --%>
+    <%= if @search_open do %>
+      <div class="search-bar">
+        <form phx-submit="search" class="search-form">
+          <span class="search-icon">🔍</span>
+          <input type="text" name="query" value={@search_query}
+            placeholder="Search messages in this channel..."
+            class="search-input" id="search-input" autofocus autocomplete="off" />
+          <button type="button" phx-click="close_search" class="search-close">✕</button>
+        </form>
+        <%= if @search_query != "" do %>
+          <div class="search-count"><%= length(@search_results) %> results for "<%= @search_query %>"</div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <%!-- Pinned messages bar --%>
+    <%= if @show_pins and length(@pinned_messages) > 0 do %>
+      <div class="pins-bar">
+        <div class="pins-bar-header">
+          <span class="pins-bar-title">📌 <%= length(@pinned_messages) %> Pinned Messages</span>
+          <button phx-click="toggle_pins" class="pins-bar-close">✕</button>
+        </div>
+        <%= for pin <- @pinned_messages do %>
+          <div class="pin-item">
+            <div class="pin-meta">
+              <span class="pin-user" style={"color: #{user_color(pin.message.username)};"}>
+                <%= pin.message.username %>
+              </span>
+              <span class="pin-time"><%= format_time(pin.message.inserted_at) %></span>
+            </div>
+            <div class="pin-content"><%= String.slice(pin.message.content || "", 0, 120) %></div>
+            <button class="unpin-btn" phx-click="unpin_message"
+              phx-value-id={pin.message_id} title="Unpin">✕</button>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <%!-- Chat body (messages + thread panel) --%>
+    <div class="chat-body">
+
+      <%!-- Message list --%>
+      <div class="message-list" id="message-list" phx-hook="ScrollToBottom">
+
+        <%= if @has_more and not @search_open do %>
+          <div class="load-more-wrap">
+            <button phx-click="load_more" class="load-more-btn">↑ Load older messages</button>
+          </div>
+        <% end %>
+
+        <%= if @search_open do %>
+          <%= if Enum.empty?(@search_results) and @search_query != "" do %>
+            <div class="empty-room">
+              <div class="empty-icon">🔍</div>
+              <p class="empty-title">No results found</p>
+              <p class="empty-sub">No messages matching "<%= @search_query %>"</p>
+            </div>
+          <% end %>
+        <% else %>
+          <%= if Enum.empty?(@messages) do %>
+            <div class="empty-room">
+              <div class="empty-icon">👋</div>
+              <p class="empty-title">Welcome to #<%= room_display(@channels, @room) %>!</p>
+              <p class="empty-sub">Send the first message to get started.</p>
+            </div>
+          <% end %>
+        <% end %>
+
+        <% display_msgs = if @search_open, do: @search_results, else: @messages %>
+        <%= for msg <- display_msgs do %>
+          <%= if msg.type == :system do %>
+            <div class="msg-system"><span>── <%= msg.content %> ──</span></div>
+          <% else %>
+            <div class={"msg-row #{if msg.username == @username, do: "is-mine"}"} id={"msg-#{msg.id}"}>
+              <div class="msg-avatar" style={"background: #{user_color(msg.username)};"} title={msg.username}>
+                <%= String.first(msg.username) |> String.upcase() %>
+              </div>
+
+              <div class="msg-body">
+                <div class="msg-meta">
+                  <span class="msg-username" style={"color: #{user_color(msg.username)};"}>
+                    <%= msg.username %>
+                  </span>
+                  <%= if @is_admin and msg.username == @username do %>
+                    <span class="admin-msg-badge">👑 Admin</span>
+                  <% end %>
+                  <span class="msg-time"><%= format_time(msg.inserted_at) %></span>
+                  <%= if msg.edited and not msg.deleted do %>
+                    <span class="msg-edited">(edited)</span>
+                  <% end %>
+                </div>
+
+                <%= if @editing_id == msg.id do %>
+                  <form phx-submit="save_edit" class="msg-edit-form">
+                    <input type="hidden" name="_id" value={msg.id} />
+                    <input type="text" name="content" value={@edit_content}
+                      class="edit-input" autofocus autocomplete="off" />
+                    <div class="edit-actions">
+                      <button type="submit" class="edit-save-btn">Save</button>
+                      <button type="button" phx-click="cancel_edit" class="edit-cancel-btn">Cancel</button>
+                    </div>
+                  </form>
+                <% else %>
+                  <%= if msg.deleted do %>
+                    <div class="msg-bubble msg-deleted"><em>This message has been deleted.</em></div>
+                  <% else %>
+                    <div class="msg-bubble">
+                      <%= render_content(msg.content) %>
+                      <%= if msg.file_url do %>
+                        <div class="msg-image-wrap">
+                          <img src={msg.file_url} alt={msg.file_name}
+                            class="msg-image" loading="lazy" />
+                          <div class="msg-file-name"><%= msg.file_name %></div>
+                        </div>
+                      <% end %>
+                    </div>
+                  <% end %>
+
+                  <%!-- Inline emoji picker --%>
+                  <%= if @emoji_picker_id == msg.id do %>
+                    <div class="emoji-picker-inline">
+                      <%= for emoji <- ["👍","❤️","😂","😮","😢","🎉","✅","🔥"] do %>
+                        <button class="emoji-pick-btn"
+                          phx-click="toggle_reaction"
+                          phx-value-id={msg.id}
+                          phx-value-emoji={emoji}><%= emoji %></button>
+                      <% end %>
+                    </div>
+                  <% end %>
+
+                  <%!-- Reactions --%>
+                  <% rxns = decode_reactions_view(msg.reactions) %>
+                  <%= if map_size(rxns) > 0 do %>
+                    <div class="msg-reactions">
+                      <%= for {emoji, users} <- rxns do %>
+                        <button
+                          class={"reaction-chip #{if @username in users, do: "reacted"}"}
+                          phx-click="toggle_reaction"
+                          phx-value-id={msg.id}
+                          phx-value-emoji={emoji}
+                          title={Enum.join(users, ", ")}
+                        ><%= emoji %> <span class="reaction-count"><%= length(users) %></span></button>
+                      <% end %>
+                    </div>
+                  <% end %>
+
+                  <%!-- Thread reply count --%>
+                  <%= if (msg.reply_count || 0) > 0 do %>
+                    <button class="thread-replies-btn"
+                      phx-click="open_thread" phx-value-id={msg.id}>
+                      💬 <%= msg.reply_count %> replies
+                      <span class="thread-last-time"><%= format_time(msg.last_reply_at) %></span>
+                    </button>
+                  <% end %>
+
+                  <%!-- Hover actions --%>
+                  <div class="msg-actions">
+                    <button class="action-btn" phx-click="toggle_emoji_picker"
+                      phx-value-id={msg.id} title="Add reaction">😊</button>
+                    <button class="action-btn" phx-click="open_thread"
+                      phx-value-id={msg.id} title="Reply">💬</button>
+                    <%= if is_binary(@username) and not msg.deleted do %>
+                      <button class="action-btn" phx-click="pin_message"
+                        phx-value-id={msg.id} title="Pin">📌</button>
+                    <% end %>
+                    <%= if msg.username == @username and not msg.deleted do %>
+                      <button class="action-btn edit-btn" phx-click="start_edit"
+                        phx-value-id={msg.id} title="Edit">✏️</button>
+                    <% end %>
+                    <%= if (msg.username == @username or @is_admin) and not msg.deleted do %>
+                      <button class="action-btn del-btn" phx-click="delete_message"
+                        phx-value-id={msg.id} title="Delete"
+                        data-confirm="Delete this message?">🗑️</button>
+                    <% end %>
+                    <%= if @is_admin do %>
+                      <button class="action-btn hard-del-btn" phx-click="hard_delete_message"
+                        phx-value-id={msg.id} title="Permanently delete (Admin)"
+                        data-confirm="Permanently delete this message and its file from the server? This cannot be undone.">💀</button>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+
+      <%!-- Thread panel --%>
+      <%= if @thread_open and @thread_root do %>
+        <div class="thread-panel" id="thread-panel">
+          <div class="thread-header">
+            <span class="thread-title">Thread</span>
+            <button phx-click="close_thread" class="thread-close-btn">✕</button>
+          </div>
+
+          <div class="thread-body" id="thread-body" phx-hook="ThreadScroll">
+            <%!-- Original message --%>
+            <div class="thread-root-msg">
+              <div class="msg-avatar-sm" style={"background: #{user_color(@thread_root.username)};"}>
+                <%= String.first(@thread_root.username) |> String.upcase() %>
+              </div>
+              <div class="thread-msg-content">
+                <div class="msg-meta">
+                  <span class="msg-username" style={"color: #{user_color(@thread_root.username)};"}>
+                    <%= @thread_root.username %>
+                  </span>
+                  <span class="msg-time"><%= format_time(@thread_root.inserted_at) %></span>
+                </div>
+                <div class="msg-bubble"><%= render_content(@thread_root.content) %></div>
+              </div>
+            </div>
+
+            <div class="thread-divider">
+              <span><%= length(@thread_messages) %> replies</span>
+            </div>
+
+            <%= for reply <- @thread_messages do %>
+              <div class="thread-reply">
+                <div class="msg-avatar-sm" style={"background: #{user_color(reply.username)};"}>
+                  <%= String.first(reply.username) |> String.upcase() %>
+                </div>
+                <div class="thread-msg-content">
+                  <div class="msg-meta">
+                    <span class="msg-username" style={"color: #{user_color(reply.username)};"}>
+                      <%= reply.username %>
+                    </span>
+                    <span class="msg-time"><%= format_time(reply.inserted_at) %></span>
+                  </div>
+                  <div class="msg-bubble"><%= render_content(reply.content) %></div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+
+          <div class="thread-input-area">
+            <%= if @username do %>
+              <form phx-submit="send_thread_reply" class="thread-form">
+                <div class="thread-input-wrapper">
+                  <div class="input-avatar" style={"background: #{user_color(@username)};"}>
+                    <%= String.first(@username) |> String.upcase() %>
+                  </div>
+                  <input type="text" name="message" placeholder="Reply..."
+                    class="thread-input" id="thread-input"
+                    autocomplete="off" maxlength="2000" />
+                  <button type="submit" class="send-btn" title="Send">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                  </button>
+                </div>
+              </form>
+            <% else %>
+              <div class="thread-login-prompt">Log in to reply</div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+    </div><%!-- /chat-body --%>
+
+    <%!-- Typing indicator --%>
+    <%= if @typing_users != [] do %>
+      <div class="typing-indicator">
+        <div class="typing-dots"><span></span><span></span><span></span></div>
+        <span class="typing-text"><%= typing_text(@typing_users) %></span>
+      </div>
+    <% end %>
+
+    <%!-- Input area --%>
+    <div class="input-area">
+      <%= if @username do %>
+        <form phx-submit="send_message" phx-change="validate_upload" class="input-form">
+          <%= for entry <- @uploads.image.entries do %>
+            <div class="upload-preview">
+              <.live_img_preview entry={entry} class="upload-thumb" />
+              <span class="upload-name"><%= entry.client_name %></span>
+              <button type="button" phx-click="cancel_upload"
+                phx-value-ref={entry.ref} class="upload-cancel">✕</button>
+            </div>
+          <% end %>
+
+          <div class="input-wrapper">
+            <div class="input-avatar" style={"background: #{user_color(@username)};"}>
+              <%= String.first(@username) |> String.upcase() %>
+            </div>
+            <input type="text" name="message"
+              placeholder={"Message ##{room_display(@channels, @room)}..."}
+              class="msg-input" id="msg-input"
+              autocomplete="off" maxlength="2000"
+              phx-hook="MentionInput" />
+            <label class="attach-btn" title="Attach image">
+              📎
+              <.live_file_input upload={@uploads.image} class="hidden-file-input" />
+            </label>
+            <button type="submit" class="send-btn" title="Send (Enter)">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              </svg>
+            </button>
+          </div>
+        </form>
+      <% else %>
+        <div class="login-prompt">
+          <span>Enter a username to join the chat</span>
+          <button phx-click={JS.show(to: "#username-modal")} class="login-btn">Join</button>
+        </div>
+      <% end %>
+    </div>
+
+  </main>
+</div>
