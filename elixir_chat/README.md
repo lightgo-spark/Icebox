@@ -32,7 +32,6 @@ A full-featured real-time chat application built with **Elixir**, **Phoenix Live
 - **Stats tab**: Real-time dashboard (channels, users, messages, bans, pins)
 
 ### UI/UX
-- Discord-inspired dark theme
 - Responsive design with mobile sidebar toggle
 - Color-coded user avatars
 - Smooth animations and transitions
