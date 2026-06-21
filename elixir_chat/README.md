@@ -2,7 +2,8 @@
 
 A full-featured real-time chat application built with **Elixir**, **Phoenix LiveView**, and **SQLite**.
 
-![LiveChat Screenshot](screenshots/login.png)
+<img src="screenshots/login.png" alt="LiveChat Screenshot" width="800" align="left" />
+<br clear="left" />
 
 ## Features
 
